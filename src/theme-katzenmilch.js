@@ -27,7 +27,6 @@ background: rgba(100, 5, 208, 0.27)\
 }\
 .ace-katzenmilch.ace_multiselect .ace_selection.ace_start {\
 box-shadow: 0 0 3px 0px #f3f2f3;\
-border-radius: 2px\
 }\
 .ace-katzenmilch .ace_marker-layer .ace_step {\
 background: rgb(198, 219, 174)\

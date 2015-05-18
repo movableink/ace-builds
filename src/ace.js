@@ -1652,13 +1652,14 @@ exports.addCommandKeyListener = function(el, callback) {
         });
 
         if (!pressedKeys) {
-            pressedKeys = Object.create(null);
-            addListener(window, "focus", function(e) {
-                pressedKeys = Object.create(null);
-            });
+            resetPressedKeys();
+            addListener(window, "focus", resetPressedKeys);
         }
     }
 };
+function resetPressedKeys(e) {
+    pressedKeys = Object.create(null);
+}
 
 if (window.postMessage && !useragent.isOldIE) {
     var postMessageId = 1;
@@ -1759,7 +1760,7 @@ exports.deepCopy = function deepCopy(obj) {
     if (cons === RegExp)
         return obj;
     
-    copy = cons();
+    copy = new cons();
     for (var key in obj) {
         copy[key] = deepCopy(obj[key]);
     }
@@ -2139,7 +2140,7 @@ var TextInput = function(parentNode, host) {
         var data = handleClipboardData(e);
         if (typeof data == "string") {
             if (data)
-                host.onPaste(data);
+                host.onPaste(data, e);
             if (useragent.isIE)
                 setTimeout(resetSelection);
             event.preventDefault(e);
@@ -3542,7 +3543,7 @@ var AppConfig = require("./lib/app_config").AppConfig;
 module.exports = exports = new AppConfig();
 
 var global = (function() {
-    return this;
+    return this || typeof window != "undefined" && window;
 })();
 
 var options = {
@@ -8111,7 +8112,7 @@ var EditSession = function(text, mode) {
     this.$foldData = [];
     this.$foldData.toString = function() {
         return this.join("\n");
-    }
+    };
     this.on("changeFold", this.onChangeFold.bind(this));
     this.$onChange = this.onChange.bind(this);
 
@@ -11798,11 +11799,11 @@ var Editor = function(renderer, session) {
     this.onCut = function() {
         this.commands.exec("cut", this);
     };
-    this.onPaste = function(text) {
+    this.onPaste = function(text, event) {
         if (this.$readOnly)
             return;
 
-        var e = {text: text};
+        var e = {text: text, event: event};
         this._signal("paste", e);
         text = e.text;
         if (!this.inMultiSelectMode || this.inVirtualSelectionMode) {
@@ -13374,7 +13375,7 @@ var Marker = function(parentEl) {
                 else
                     this.drawMultiLineMarker(html, range, marker.clazz, config);
             } else {
-                this.drawSingleLineMarker(html, range, marker.clazz + " ace_start", config);
+                this.drawSingleLineMarker(html, range, marker.clazz + " ace_start" + " ace_br15", config);
             }
         }
         this.element.innerHTML = html.join("");
@@ -13383,25 +13384,30 @@ var Marker = function(parentEl) {
     this.$getTop = function(row, layerConfig) {
         return (row - layerConfig.firstRowScreen) * layerConfig.lineHeight;
     };
+
+    function getBorderClass(tl, tr, br, bl) {
+        return (tl ? 1 : 0) | (tr ? 2 : 0) | (br ? 4 : 0) | (bl ? 8 : 0);
+    }
     this.drawTextMarker = function(stringBuilder, range, clazz, layerConfig, extraStyle) {
-        var row = range.start.row;
         var session = this.session;
-
-        var lineRange = new Range(
-            row, range.start.column,
-            row, session.getScreenLastRowColumn(row)
-        );
-        this.drawSingleLineMarker(stringBuilder, lineRange, clazz + " ace_start", layerConfig, 1, extraStyle);
-        row = range.end.row;
-        lineRange = new Range(row, session.getRowWrapIndent(row), row, range.end.column);
-        this.drawSingleLineMarker(stringBuilder, lineRange, clazz, layerConfig, 0, extraStyle);
-
-        for (row = range.start.row + 1; row < range.end.row; row++) {
-            lineRange.start.row = row;
-            lineRange.start.column = session.getRowWrapIndent(row);
-            lineRange.end.row = row;
-            lineRange.end.column = session.getScreenLastRowColumn(row);
-            this.drawSingleLineMarker(stringBuilder, lineRange, clazz, layerConfig, 1, extraStyle);
+        var start = range.start.row;
+        var end = range.end.row;
+        var row = start;
+        var prev = 0; 
+        var curr = 0;
+        var next = session.getScreenLastRowColumn(row);
+        var lineRange = new Range(row, range.start.column, row, curr);
+        for (; row <= end; row++) {
+            lineRange.start.row = lineRange.end.row = row;
+            lineRange.start.column = row == start ? range.start.column : session.getRowWrapIndent(row);
+            lineRange.end.column = next;
+            prev = curr;
+            curr = next;
+            next = row + 1 < end ? session.getScreenLastRowColumn(row + 1) : row == end ? 0 : range.end.column;
+            this.drawSingleLineMarker(stringBuilder, lineRange, 
+                clazz + (row == start  ? " ace_start" : "") + " ace_br"
+                    + getBorderClass(row == start || row == start + 1 && range.start.column, prev < curr, curr > next, row == end),
+                layerConfig, row == end ? 0 : 1, extraStyle);
         }
     };
     this.drawMultiLineMarker = function(stringBuilder, range, clazz, config, extraStyle) {
@@ -13412,7 +13418,7 @@ var Marker = function(parentEl) {
         extraStyle = extraStyle || "";
 
         stringBuilder.push(
-            "<div class='", clazz, " ace_start' style='",
+            "<div class='", clazz, " ace_br1 ace_start' style='",
             "height:", height, "px;",
             "right:0;",
             "top:", top, "px;",
@@ -13422,7 +13428,7 @@ var Marker = function(parentEl) {
         var width = range.end.column * config.characterWidth;
 
         stringBuilder.push(
-            "<div class='", clazz, "' style='",
+            "<div class='", clazz, " ace_br12' style='",
             "height:", height, "px;",
             "width:", width, "px;",
             "top:", top, "px;",
@@ -13432,9 +13438,11 @@ var Marker = function(parentEl) {
         if (height <= 0)
             return;
         top = this.$getTop(range.start.row + 1, config);
+        
+        var radiusClass = (range.start.column ? 1 : 0) | (range.end.column ? 0 : 8);
 
         stringBuilder.push(
-            "<div class='", clazz, "' style='",
+            "<div class='", clazz, (radiusClass ? " ace_br" + radiusClass : ""), "' style='",
             "height:", height, "px;",
             "right:0;",
             "top:", top, "px;",
@@ -14907,6 +14915,21 @@ background-color: rgba(255, 255, 0,0.2);\
 position: absolute;\
 z-index: 8;\
 }\
+.ace_br1 {border-top-left-radius    : 3px;}\
+.ace_br2 {border-top-right-radius   : 3px;}\
+.ace_br3 {border-top-left-radius    : 3px; border-top-right-radius:    3px;}\
+.ace_br4 {border-bottom-right-radius: 3px;}\
+.ace_br5 {border-top-left-radius    : 3px; border-bottom-right-radius: 3px;}\
+.ace_br6 {border-top-right-radius   : 3px; border-bottom-right-radius: 3px;}\
+.ace_br7 {border-top-left-radius    : 3px; border-top-right-radius:    3px; border-bottom-right-radius: 3px;}\
+.ace_br8 {border-bottom-left-radius : 3px;}\
+.ace_br9 {border-top-left-radius    : 3px; border-bottom-left-radius:  3px;}\
+.ace_br10{border-top-right-radius   : 3px; border-bottom-left-radius:  3px;}\
+.ace_br11{border-top-left-radius    : 3px; border-top-right-radius:    3px; border-bottom-left-radius:  3px;}\
+.ace_br12{border-bottom-right-radius: 3px; border-bottom-left-radius:  3px;}\
+.ace_br13{border-top-left-radius    : 3px; border-bottom-right-radius: 3px; border-bottom-left-radius:  3px;}\
+.ace_br14{border-top-right-radius   : 3px; border-bottom-right-radius: 3px; border-bottom-left-radius:  3px;}\
+.ace_br15{border-top-left-radius    : 3px; border-top-right-radius:    3px; border-bottom-right-radius: 3px; border-bottom-left-radius: 3px;}\
 ";
 
 dom.importCssString(editorCss, "ace_editor.css");
@@ -17812,7 +17835,6 @@ background: rgb(181, 213, 255);\
 }\
 .ace-tm.ace_multiselect .ace_selection.ace_start {\
 box-shadow: 0 0 3px 0px white;\
-border-radius: 2px;\
 }\
 .ace-tm .ace_marker-layer .ace_step {\
 background: rgb(252, 255, 0);\

@@ -901,10 +901,9 @@ var Editor = require("./editor").Editor;
 
 });
 
-define("ace/autocomplete/popup",["require","exports","module","ace/edit_session","ace/virtual_renderer","ace/editor","ace/range","ace/lib/event","ace/lib/lang","ace/lib/dom"], function(require, exports, module) {
+define("ace/autocomplete/popup",["require","exports","module","ace/virtual_renderer","ace/editor","ace/range","ace/lib/event","ace/lib/lang","ace/lib/dom"], function(require, exports, module) {
 "use strict";
 
-var EditSession = require("../edit_session").EditSession;
 var Renderer = require("../virtual_renderer").VirtualRenderer;
 var Editor = require("../editor").Editor;
 var Range = require("../range").Range;
@@ -1369,7 +1368,7 @@ var Autocomplete = function() {
 
     this.blurListener = function(e) {
         var el = document.activeElement;
-        var text = this.editor.textInput.getElement()
+        var text = this.editor.textInput.getElement();
         if (el != text && ( !this.popup || el.parentNode != this.popup.container )
             && el != this.tooltipNode && e.relatedTarget != this.tooltipNode
             && e.relatedTarget != text
@@ -1564,7 +1563,7 @@ var Autocomplete = function() {
             doc = selected;
 
         if (typeof doc == "string")
-            doc = {docText: doc}
+            doc = {docText: doc};
         if (!doc || !(doc.docHTML || doc.docText))
             return this.hideDocTooltip();
         this.showDocTooltip(doc);
@@ -1630,7 +1629,7 @@ Autocomplete.startCommand = {
     bindKey: "Ctrl-Space|Ctrl-Shift-Space|Alt-Space"
 };
 
-var FilteredList = function(array, filterText, mutateData) {
+var FilteredList = function(array, filterText) {
     this.all = array;
     this.filtered = array;
     this.filterText = filterText || "";

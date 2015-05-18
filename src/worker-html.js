@@ -288,7 +288,7 @@ exports.deepCopy = function deepCopy(obj) {
     if (cons === RegExp)
         return obj;
     
-    copy = cons();
+    copy = new cons();
     for (var key in obj) {
         copy[key] = deepCopy(obj[key]);
     }
